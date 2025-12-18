@@ -1,0 +1,16 @@
+feat: added all features to expense tracker app
+
+added pie and bar charts, fixed all the lint errors, wrote a lot of documentation
+
+- charts now work
+- fixed the deprecated withOpacity stuff
+- added all the features we talked about
+- 8 different categories
+- you can add expenses and see them in history
+- added proper validation and stuff
+- updated the tests
+- added documentation for how to use it
+
+the app actually works now and looks pretty good
+
+all lint errors are gone

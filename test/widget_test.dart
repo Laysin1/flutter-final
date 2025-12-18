@@ -11,20 +11,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:expense_tracker/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('App initializes correctly', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const ExpenseApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the app bar is displayed
+    expect(find.text('Expense Tracker'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify bottom navigation is visible
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify home tab is selected by default
+    expect(find.byIcon(Icons.home), findsOneWidget);
+  });
+
+  testWidgets('Navigation tabs switch views', (WidgetTester tester) async {
+    await tester.pumpWidget(const ExpenseApp());
+
+    // Verify we start at Home tab
+    expect(find.text('Home'), findsWidgets);
+
+    // Tap on Charts tab
+    await tester.tap(find.byIcon(Icons.pie_chart));
+    await tester.pumpAndSettle();
+
+    // Verify navigation worked
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
   });
 }

@@ -1,6 +1,6 @@
 name: expense_tracker
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -14,6 +14,15 @@ dependencies:
 
   # ⭐ Add this package for saving data locally
   shared_preferences: ^2.2.2
+
+  # Charts and graphs
+  fl_chart: ^0.68.0
+
+  # Date picker
+  intl: ^0.20.0
+
+  # Icons
+  font_awesome_flutter: ^10.7.0
 
 dev_dependencies:
   flutter_test:
