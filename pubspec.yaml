@@ -11,17 +11,11 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-
-  # ⭐ Add this package for saving data locally
   shared_preferences: ^2.2.2
-
-  # Charts and graphs
   fl_chart: ^0.68.0
-
-  # Date picker
   intl: ^0.20.0
-
-  # Icons
+  google_sign_in: ^6.1.4
+  flutter_facebook_auth: ^5.0.11
   font_awesome_flutter: ^10.7.0
 
 dev_dependencies:

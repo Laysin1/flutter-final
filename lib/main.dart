@@ -1,22 +1,475 @@
 import 'package:flutter/material.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/add_expense_screen.dart';
+import 'screens/edit_expense_screen.dart';
+import 'screens/category_management_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'screens/profile_screen.dart';
 
 void main() {
   runApp(ExpenseApp());
 }
 
-class ExpenseApp extends StatelessWidget {
+class ExpenseApp extends StatefulWidget {
   const ExpenseApp({super.key});
+
+  @override
+  State<ExpenseApp> createState() => _ExpenseAppState();
+}
+
+class _ExpenseAppState extends State<ExpenseApp> {
+  bool darkMode = false;
+  String selectedLanguage = 'English';
+  bool isLoggedIn = false;
+  bool showRegister = false;
+
+  // Demo user info
+  String userName = 'Alex';
+
+  // Navigation for main app
+  int mainTabIndex = 0;
+
+  List<Expense> expenses = [];
+  Expense? editingExpense;
+
+  // Dummy categories
+  List<String> categories = [
+    'Food',
+    'Transport',
+    'Entertainment',
+    'Utilities',
+    'Shopping',
+    'Health',
+    'Education',
+    'Other',
+  ];
+
+  // For period switch in dashboard
+  int selectedPeriodIndex = 2;
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Food':
+        return Icons.fastfood;
+      case 'Transport':
+        return Icons.directions_car;
+      case 'Entertainment':
+        return Icons.movie;
+      case 'Utilities':
+        return Icons.lightbulb;
+      case 'Shopping':
+        return Icons.shopping_bag;
+      case 'Health':
+        return Icons.health_and_safety;
+      case 'Education':
+        return Icons.school;
+      default:
+        return Icons.category;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      home: ExpenseHome(),
+      theme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Inter',
+        scaffoldBackgroundColor: darkMode
+            ? Color(0xFF18181B)
+            : Color(0xFFF5F5F5),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF7C3AED),
+          brightness: darkMode ? Brightness.dark : Brightness.light,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            color: darkMode ? Color(0xFFF5F5F5) : Color(0xFF22223B),
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            fontFamily: 'Inter',
+          ),
+          iconTheme: IconThemeData(color: Color(0xFF7C3AED)),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Color(0xFFE0E7FF)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Color(0xFF7C3AED), width: 2),
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 4,
+          shadowColor: Colors.black12,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF7C3AED),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            textStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontFamily: 'Inter',
+            ),
+            padding: EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+      ),
+      home: Builder(
+        builder: (context) {
+          if (!isLoggedIn) {
+            if (showRegister) {
+              return RegisterScreen(
+                onLoginTap: () => setState(() => showRegister = false),
+              );
+            } else {
+              return LoginScreen(
+                onRegisterTap: () => setState(() => showRegister = true),
+                onLogin: () => setState(() => isLoggedIn = true),
+              );
+            }
+          }
+          // Main app navigation
+          if (editingExpense != null) {
+            return EditExpenseScreen(
+              title: editingExpense!.title,
+              amount: editingExpense!.amount,
+              category: editingExpense!.category,
+              date: editingExpense!.date,
+              notes: editingExpense!.notes,
+              categories: categories,
+              onSave: (title, amount, category, date, notes) {
+                setState(() {
+                  final idx = expenses.indexWhere(
+                    (e) => e.id == editingExpense!.id,
+                  );
+                  if (idx != -1) {
+                    expenses[idx] = Expense(
+                      id: editingExpense!.id,
+                      title: title,
+                      amount: amount,
+                      category: category,
+                      date: date,
+                      notes: notes,
+                    );
+                  }
+                  editingExpense = null;
+                  mainTabIndex = 0;
+                });
+              },
+            );
+          }
+          return Scaffold(
+            body: IndexedStack(
+              index: mainTabIndex,
+              children: [
+                DashboardScreen(
+                  userName: userName,
+                  totalExpenses: expenses.fold(0, (sum, e) => sum + e.amount),
+                  recentExpenses: (() {
+                    final sorted = expenses.toList();
+                    sorted.sort((a, b) => b.date.compareTo(a.date));
+                    return sorted
+                        .take(10)
+                        .map(
+                          (e) => {
+                            'id': e.id,
+                            'title': e.title,
+                            'date': DateFormat('yyyy-MM-dd').format(e.date),
+                            'amount': e.amount,
+                            'icon': _getCategoryIcon(e.category),
+                          },
+                        )
+                        .toList();
+                  })(),
+                  onEdit: (id) {
+                    final idx = expenses.indexWhere((e) => e.id == id);
+                    if (idx != -1)
+                      setState(() => editingExpense = expenses[idx]);
+                  },
+                  onDelete: (id) {
+                    setState(() {
+                      expenses.removeWhere((e) => e.id == id);
+                    });
+                  },
+                  onAddExpense: () {
+                    setState(() => mainTabIndex = 1);
+                  },
+                  selectedPeriodIndex: selectedPeriodIndex,
+                  onPeriodChange: (i) =>
+                      setState(() => selectedPeriodIndex = i),
+                ),
+                AddExpenseScreen(
+                  categories: categories,
+                  onSave: (title, amount, category, date, notes) {
+                    setState(() {
+                      expenses.add(
+                        Expense(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          title: title,
+                          amount: amount,
+                          category: category,
+                          date: date,
+                          notes: notes,
+                        ),
+                      );
+                      mainTabIndex = 0;
+                    });
+                  },
+                ),
+                CategoryManagementScreen(
+                  categories: categories,
+                  onEdit: (cat) {},
+                  onDelete: (cat) {},
+                  onAdd: () {},
+                ),
+                AnalyticsScreen(expenses: expenses),
+                ProfileScreen(
+                  userName: userName,
+                  email: 'alex@email.com',
+                  phone: '',
+                  currency: 'USD',
+                  dateFormat: 'MM/dd/yyyy',
+                  totalMonthlySpending: expenses
+                      .where(
+                        (e) =>
+                            e.date.month == DateTime.now().month &&
+                            e.date.year == DateTime.now().year,
+                      )
+                      .fold(0.0, (sum, e) => sum + e.amount),
+                  biggestCategory: (() {
+                    final Map<String, double> catTotals = {};
+                    for (var e in expenses.where(
+                      (e) =>
+                          e.date.month == DateTime.now().month &&
+                          e.date.year == DateTime.now().year,
+                    )) {
+                      catTotals[e.category] =
+                          (catTotals[e.category] ?? 0) + e.amount;
+                    }
+                    if (catTotals.isEmpty) return '-';
+                    return catTotals.entries
+                        .reduce((a, b) => a.value > b.value ? a : b)
+                        .key;
+                  })(),
+                  transactionCount: expenses
+                      .where(
+                        (e) =>
+                            e.date.month == DateTime.now().month &&
+                            e.date.year == DateTime.now().year,
+                      )
+                      .length,
+                  darkMode: darkMode,
+                  notificationsEnabled: true,
+                  language: 'English',
+                  profileCompletion: 0.8,
+                  onEditProfile: () async {
+                    final result = await showDialog<Map<String, String>>(
+                      context: context,
+                      builder: (context) {
+                        final nameController = TextEditingController(
+                          text: userName,
+                        );
+                        final emailController = TextEditingController(
+                          text: 'alex@email.com',
+                        );
+                        final phoneController = TextEditingController(text: '');
+                        return AlertDialog(
+                          title: Text('Edit Profile'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: nameController,
+                                decoration: InputDecoration(labelText: 'Name'),
+                              ),
+                              TextField(
+                                controller: emailController,
+                                decoration: InputDecoration(labelText: 'Email'),
+                              ),
+                              TextField(
+                                controller: phoneController,
+                                decoration: InputDecoration(labelText: 'Phone'),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context, {
+                                  'name': nameController.text,
+                                  'email': emailController.text,
+                                  'phone': phoneController.text,
+                                });
+                              },
+                              child: Text('Save'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (result != null) {
+                      setState(() {
+                        userName = result['name'] ?? userName;
+                        // You can also update email/phone if you store them as state
+                      });
+                    }
+                  },
+                  onToggleDarkMode: () {
+                    setState(() {
+                      darkMode = !darkMode;
+                    });
+                  },
+                  onToggleNotifications: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Notifications'),
+                        content: Text(
+                          'Notification settings not implemented in this demo.',
+                        ),
+                      ),
+                    );
+                  },
+                  onChangeLanguage: () async {
+                    final result = await showDialog<String>(
+                      context: context,
+                      builder: (context) {
+                        String selected = 'English';
+                        return AlertDialog(
+                          title: Text('Select Language'),
+                          content: DropdownButton<String>(
+                            value: selected,
+                            items: ['English', 'Spanish', 'French', 'German']
+                                .map(
+                                  (lang) => DropdownMenuItem(
+                                    value: lang,
+                                    child: Text(lang),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) => selected = v ?? 'English',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, selected),
+                              child: Text('OK'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    if (result != null) {
+                      // Save language preference if needed
+                    }
+                  },
+                  onChangePassword: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Change Password'),
+                        content: Text(
+                          'Password change not implemented in this demo.',
+                        ),
+                      ),
+                    );
+                  },
+                  onManageCategories: () {
+                    setState(() => mainTabIndex = 2);
+                  },
+                  onLogout: () {
+                    setState(() {
+                      isLoggedIn = false;
+                      mainTabIndex = 0;
+                    });
+                  },
+                  onDeleteAccount: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Delete Account'),
+                        content: Text(
+                          'Are you sure you want to delete your account? This action cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      setState(() {
+                        isLoggedIn = false;
+                        mainTabIndex = 0;
+                        expenses.clear();
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: mainTabIndex,
+              type: BottomNavigationBarType.fixed,
+              onTap: (i) => setState(() => mainTabIndex = i),
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.add_circle),
+                  label: 'Add',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.category),
+                  label: 'Categories',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.analytics),
+                  label: 'Analytics',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -65,6 +518,128 @@ class ExpenseHome extends StatefulWidget {
 }
 
 class _ExpenseHomeState extends State<ExpenseHome> {
+  void _showEditExpenseDialog(Expense expense) {
+    final titleCtrl = TextEditingController(text: expense.title);
+    final amountCtrl = TextEditingController(text: expense.amount.toString());
+    final notesCtrl = TextEditingController(text: expense.notes ?? '');
+    String category = expense.category;
+    DateTime date = expense.date;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text('Edit Expense'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: InputDecoration(labelText: 'Title'),
+                    ),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: 'Amount'),
+                    ),
+                    SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: category,
+                      items: categories
+                          .map(
+                            (cat) =>
+                                DropdownMenuItem(value: cat, child: Text(cat)),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null)
+                          setStateDialog(() {
+                            category = val;
+                          });
+                      },
+                      decoration: InputDecoration(labelText: 'Category'),
+                    ),
+                    SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Date: \\${DateFormat('MMM dd, yyyy').format(date)}',
+                      ),
+                      trailing: Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: date,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null)
+                          setStateDialog(() {
+                            date = picked;
+                          });
+                      },
+                    ),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: notesCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(labelText: 'Notes'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (titleCtrl.text.isEmpty || amountCtrl.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please fill all fields')),
+                      );
+                      return;
+                    }
+                    setState(() {
+                      final idx = expenses.indexWhere(
+                        (e) => e.id == expense.id,
+                      );
+                      if (idx != -1) {
+                        expenses[idx] = Expense(
+                          id: expense.id,
+                          title: titleCtrl.text,
+                          amount:
+                              double.tryParse(amountCtrl.text) ??
+                              expense.amount,
+                          category: category,
+                          date: date,
+                          notes: notesCtrl.text.isNotEmpty
+                              ? notesCtrl.text
+                              : null,
+                        );
+                      }
+                    });
+                    saveExpenses();
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Expense updated')));
+                  },
+                  child: Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   List<Expense> expenses = [];
   int _selectedIndex = 0;
 
@@ -238,26 +813,35 @@ class _ExpenseHomeState extends State<ExpenseHome> {
         children: [
           // Total Card
           Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.all(24),
+            margin: EdgeInsets.all(20),
+            padding: EdgeInsets.all(32),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade400, Colors.blue.shade600],
-              ),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
               children: [
                 Text(
                   'Total Expenses',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(
+                    color: Color(0xFF7C3AED),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                SizedBox(height: 8),
+                SizedBox(height: 10),
                 Text(
                   '\$${getTotalExpenses().toStringAsFixed(2)}',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 36,
+                    color: Color(0xFF22223B),
+                    fontSize: 40,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -267,20 +851,24 @@ class _ExpenseHomeState extends State<ExpenseHome> {
 
           // Category Summary
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'By Category',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF22223B),
+                  ),
                 ),
-                SizedBox(height: 12),
+                SizedBox(height: 16),
                 ...categories.map((category) {
                   double amount = getTotalByCategory(category);
                   return amount > 0
                       ? Padding(
-                          padding: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.only(bottom: 14),
                           child: _buildCategoryItem(category, amount),
                         )
                       : const SizedBox.shrink();
@@ -289,19 +877,23 @@ class _ExpenseHomeState extends State<ExpenseHome> {
             ),
           ),
 
-          SizedBox(height: 24),
+          SizedBox(height: 32),
 
           // Recent Expenses
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+            padding: EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Recent Expenses',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF22223B),
+                  ),
                 ),
-                SizedBox(height: 12),
+                SizedBox(height: 16),
                 ...expenses.take(5).map((expense) {
                   return _buildExpenseCard(expense);
                 }),
@@ -309,7 +901,7 @@ class _ExpenseHomeState extends State<ExpenseHome> {
             ),
           ),
 
-          SizedBox(height: 24),
+          SizedBox(height: 32),
         ],
       ),
     );
@@ -345,9 +937,19 @@ class _ExpenseHomeState extends State<ExpenseHome> {
                   Text(category, style: TextStyle(fontWeight: FontWeight.w600)),
                 ],
               ),
-              Text(
-                '\$${amount.toStringAsFixed(2)}',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  Text(
+                    '\$${amount.toStringAsFixed(2)}',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red, size: 20),
+                    tooltip: 'Delete all in $category',
+                    onPressed: () => _deleteAllExpensesForCategory(category),
+                  ),
+                ],
               ),
             ],
           ),
@@ -365,6 +967,45 @@ class _ExpenseHomeState extends State<ExpenseHome> {
           Text(
             '${percentage.toStringAsFixed(1)}%',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Delete all expenses for a specific category
+  void _deleteAllExpensesForCategory(String category) {
+    final count = expenses.where((e) => e.category == category).length;
+    if (count == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No expenses found for $category')),
+      );
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete All $category Expenses?'),
+        content: Text(
+          'This will delete $count expenses in $category. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                expenses.removeWhere((e) => e.category == category);
+              });
+              saveExpenses();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Deleted all $category expenses')),
+              );
+            },
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -783,9 +1424,14 @@ class _ExpenseHomeState extends State<ExpenseHome> {
         ),
         trailing: PopupMenuButton(
           onSelected: (value) {
-            if (value == 'delete') deleteExpense(expense.id);
+            if (value == 'delete') {
+              deleteExpense(expense.id);
+            } else if (value == 'edit') {
+              _showEditExpenseDialog(expense);
+            }
           },
           itemBuilder: (context) => [
+            PopupMenuItem(value: 'edit', child: Text('Edit')),
             PopupMenuItem(value: 'delete', child: Text('Delete')),
           ],
           child: Text(
@@ -820,6 +1466,51 @@ class _ExpenseHomeState extends State<ExpenseHome> {
       default:
         return Icons.category;
     }
+  }
+
+  // Delete all expenses for a specific month and year
+  void deleteExpensesByMonth(int year, int month) {
+    final expensesToDelete = expenses
+        .where((e) => e.date.year == year && e.date.month == month)
+        .toList();
+    if (expensesToDelete.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No expenses found for $month/$year')),
+      );
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete All Expenses for $month/$year?'),
+        content: Text(
+          'This will delete ${expensesToDelete.length} expenses. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                expenses.removeWhere(
+                  (e) => e.date.year == year && e.date.month == month,
+                );
+              });
+              saveExpenses();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Deleted all expenses for $month/$year'),
+                ),
+              );
+            },
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
